@@ -1837,7 +1837,7 @@ describe('OpenAPI formula (e2e)', () => {
 
       const recordAfterFormula = await getRecord(table1Id, recordId);
       const formulaValue = recordAfterFormula.data.fields[formulaField.name];
-      expect(formulaValue).toBe('2025-10-24-hello');
+      expect(formulaValue).toBe('2025-10-24 00:00-hello');
     });
 
     it('should keep concatenated formula after updating referenced text field', async () => {
@@ -1883,7 +1883,139 @@ describe('OpenAPI formula (e2e)', () => {
 
       const recordAfterFormula = await getRecord(table1Id, recordId);
       const formulaValue = recordAfterFormula.data.fields[formulaField.name];
-      expect(formulaValue).toBe('2025-10-24-world');
+      expect(formulaValue).toBe('2025-10-24 00:00-world');
+    });
+
+    it('should flatten multi-value lookup single-select when concatenated', async () => {
+      const foreign = await createTable(baseId, {
+        name: 'lookup-single-select-foreign',
+        fields: [
+          {
+            name: 'Status',
+            type: FieldType.SingleSelect,
+            options: {
+              choices: [
+                { id: 'opt-a', name: 'Alpha' },
+                { id: 'opt-b', name: 'Beta' },
+              ],
+            } as ISelectFieldOptionsRo,
+          } as IFieldRo,
+        ],
+        records: [{ fields: { Status: 'Alpha' } }, { fields: { Status: 'Beta' } }],
+      });
+
+      let host: ITableFullVo | undefined;
+      try {
+        host = await createTable(baseId, {
+          name: 'lookup-single-select-host',
+          fields: [
+            { name: 'Title', type: FieldType.SingleLineText } as IFieldRo,
+            {
+              name: 'Link',
+              type: FieldType.Link,
+              options: {
+                foreignTableId: foreign.id,
+                relationship: Relationship.ManyMany,
+              } as ILinkFieldOptionsRo,
+            } as IFieldRo,
+          ],
+          records: [{ fields: { Title: 'host row' } }],
+        });
+
+        const statusField = foreign.fields.find((f) => f.name === 'Status')!;
+        const linkField = host.fields.find((f) => f.name === 'Link')!;
+
+        const lookupField = await createField(host.id, {
+          name: 'Status Lookup',
+          type: FieldType.SingleSelect,
+          isLookup: true,
+          lookupOptions: {
+            foreignTableId: foreign.id,
+            lookupFieldId: statusField.id,
+            linkFieldId: linkField.id,
+          } as ILookupOptionsRo,
+        } as IFieldRo);
+
+        const formulaField = await createField(host.id, {
+          name: 'Status Text',
+          type: FieldType.Formula,
+          options: {
+            expression: `'Statuses: ' & {${lookupField.id}}`,
+          },
+        });
+
+        const hostRecordId = host.records[0].id;
+
+        await updateRecordByApi(
+          host.id,
+          hostRecordId,
+          linkField.id,
+          foreign.records.map((r) => ({ id: r.id }))
+        );
+
+        const record = await getRecord(host.id, hostRecordId);
+        const lookupValue = record.data.fields[lookupField.name];
+        expect(Array.isArray(lookupValue)).toBe(true);
+        expect(record.data.fields[formulaField.name]).toBe('Statuses: Alpha, Beta');
+      } finally {
+        if (host) {
+          await permanentDeleteTable(baseId, host.id);
+        }
+        await permanentDeleteTable(baseId, foreign.id);
+      }
+    });
+
+    it('should flatten link titles when concatenated', async () => {
+      const foreign = await createTable(baseId, {
+        name: 'concat-link-foreign',
+        fields: [{ name: 'Title', type: FieldType.SingleLineText } as IFieldRo],
+        records: [{ fields: { Title: 'Link-A' } }, { fields: { Title: 'Link-B' } }],
+      });
+      let host: ITableFullVo | undefined;
+      try {
+        host = await createTable(baseId, {
+          name: 'concat-link-host',
+          fields: [
+            { name: 'Title', type: FieldType.SingleLineText } as IFieldRo,
+            {
+              name: 'Links',
+              type: FieldType.Link,
+              options: {
+                foreignTableId: foreign.id,
+                relationship: Relationship.ManyMany,
+              } as ILinkFieldOptionsRo,
+            } as IFieldRo,
+          ],
+          records: [{ fields: { Title: 'host row' } }],
+        });
+
+        const linkField = host.fields.find((f) => f.name === 'Links')!;
+
+        const formulaField = await createField(host.id, {
+          name: 'Links Text',
+          type: FieldType.Formula,
+          options: {
+            expression: `'Links: ' & {${linkField.id}}`,
+          },
+        });
+
+        const hostRecordId = host.records[0].id;
+        await updateRecordByApi(
+          host.id,
+          hostRecordId,
+          linkField.id,
+          foreign.records.map((r) => ({ id: r.id }))
+        );
+
+        const record = await getRecord(host.id, hostRecordId);
+        expect(record.data.fields[linkField.name]).toHaveLength(2);
+        expect(record.data.fields[formulaField.name]).toBe('Links: Link-A, Link-B');
+      } finally {
+        if (host) {
+          await permanentDeleteTable(baseId, host.id);
+        }
+        await permanentDeleteTable(baseId, foreign.id);
+      }
     });
 
     it('should apply LEFT/RIGHT to lookup fields', async () => {
@@ -3472,7 +3604,7 @@ describe('OpenAPI formula (e2e)', () => {
 
       const recordAfterFormula = await getRecord(table1Id, recordId);
       const formulaValue = recordAfterFormula.data.fields[formulaField.name];
-      expect(formulaValue).toBe('2025-10-26-hello');
+      expect(formulaValue).toBe('2025-10-26 00:00-hello');
     });
   });
 

@@ -803,6 +803,11 @@ abstract class BaseSqlConversionVisitor<
           // Check if either operand is a string type for concatenation
           const _leftType = this.inferExpressionType(exprContexts[0]);
           const _rightType = this.inferExpressionType(exprContexts[1]);
+          const paramMetadata = [
+            this.buildParamMetadata(exprContexts[0]),
+            this.buildParamMetadata(exprContexts[1]),
+          ];
+          this.formulaQuery.setCallMetadata(paramMetadata);
 
           const forceNumericAddition = this.shouldForceNumericAddition();
 
@@ -848,6 +853,11 @@ abstract class BaseSqlConversionVisitor<
           // Always treat & as string concatenation to avoid type issues
           const leftType = this.inferExpressionType(ctx.expr(0));
           const rightType = this.inferExpressionType(ctx.expr(1));
+          const paramMetadata = [
+            this.buildParamMetadata(ctx.expr(0)),
+            this.buildParamMetadata(ctx.expr(1)),
+          ];
+          this.formulaQuery.setCallMetadata(paramMetadata);
           const coercedLeft = this.coerceToStringForConcatenation(left, ctx.expr(0), leftType);
           const coercedRight = this.coerceToStringForConcatenation(right, ctx.expr(1), rightType);
           return this.formulaQuery.stringConcat(coercedLeft, coercedRight);
