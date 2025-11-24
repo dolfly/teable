@@ -81,7 +81,10 @@ export class GeneratedColumnQueryPostgres extends GeneratedColumnQueryAbstract {
     }
     const textExpr = `((${expr})::text)`;
     const sanitized = `REGEXP_REPLACE(${textExpr}, '[^0-9.+-]', '', 'g')`;
-    return `NULLIF(${sanitized}, '')::double precision`;
+    const cleaned = `NULLIF(${sanitized}, '')`;
+    // Avoid "?" in the regex so knex.raw doesn't misinterpret it as a binding placeholder.
+    const numericPattern = `'^[+-]{0,1}(\\d+(\\.\\d+){0,1}|\\.\\d+)$'`;
+    return `(CASE WHEN ${cleaned} IS NULL THEN NULL WHEN ${cleaned} ~ ${numericPattern} THEN ${cleaned}::double precision ELSE NULL END)`;
   }
 
   private collapseNumeric(expr: string, metadataIndex?: number): string {
