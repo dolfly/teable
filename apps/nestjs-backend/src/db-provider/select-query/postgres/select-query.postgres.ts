@@ -77,6 +77,9 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
       const boolScore = this.truthinessScore(expr, metadataIndex);
       return `(${boolScore})::double precision`;
     }
+    if (paramInfo.isJsonField || paramInfo.isMultiValueField) {
+      return this.numericFromJson(expr);
+    }
     if (isTrustedNumeric(paramInfo)) {
       return `(${expr})::double precision`;
     }
@@ -98,6 +101,17 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     // Avoid "?" in the regex so knex.raw doesn't misinterpret it as a binding placeholder.
     const numericPattern = `'^[+-]{0,1}(\\d+(\\.\\d+){0,1}|\\.\\d+)$'`;
     return `(CASE WHEN ${cleaned} IS NULL THEN NULL WHEN ${cleaned} ~ ${numericPattern} THEN ${cleaned}::double precision ELSE NULL END)`;
+  }
+
+  private numericFromJson(expr: string): string {
+    const jsonExpr = `(${expr})::jsonb`;
+    const numericPattern = `'^[+-]{0,1}(\\d+(\\.\\d+){0,1}|\\.\\d+)$'`;
+    const arraySum = `(SELECT SUM(CASE WHEN elem.value ~ ${numericPattern} THEN elem.value::double precision ELSE NULL END) FROM jsonb_array_elements_text(${jsonExpr}) AS elem(value))`;
+    return `(CASE
+      WHEN ${expr} IS NULL THEN NULL
+      WHEN jsonb_typeof(${jsonExpr}) = 'array' THEN ${arraySum}
+      ELSE ${this.looseNumericCoercion(expr)}
+    END)`;
   }
 
   private collapseNumeric(expr: string, metadataIndex?: number): string {
