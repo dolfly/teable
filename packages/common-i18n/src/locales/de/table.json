@@ -50,7 +50,8 @@
   },
   "welcome": {
     "title": "Willkommen",
-    "description": "Klicken Sie auf das + Zeichen in der linken Seitenleiste, um eine Tabelle zu erstellen.",
+    "emptyTitle": "Beginnen Sie mit dem Aufbau Ihrer Datenbank",
+    "description": "Klicken Sie auf den „+“-Knopf in der Seitenleiste, um Ressourcen hinzuzufügen und effizient Ihre Daten zu verwalten.",
     "help": "Weitere Informationen finden Sie im <HelpCenter />.",
     "helpCenter": "Hilfe-Center"
   },
