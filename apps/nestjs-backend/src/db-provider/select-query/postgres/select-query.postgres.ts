@@ -98,6 +98,9 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     }
     const paramInfo = this.getParamInfo(metadataIndex);
     const expressionFieldType = this.getExpressionFieldType(expr);
+    const targetDbType = (this.context as ISelectFormulaConversionContext | undefined)
+      ?.targetDbFieldType;
+
     if (isBooleanLikeParam(paramInfo)) {
       const boolScore = this.truthinessScore(expr, metadataIndex);
       return `(${boolScore})::double precision`;
@@ -125,6 +128,12 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     if (
       !paramInfo?.hasMetadata &&
       (expressionFieldType === DbFieldType.Real || expressionFieldType === DbFieldType.Integer)
+    ) {
+      return `(${expr})::double precision`;
+    }
+    if (
+      !paramInfo?.hasMetadata &&
+      (targetDbType === DbFieldType.Real || targetDbType === DbFieldType.Integer)
     ) {
       return `(${expr})::double precision`;
     }
@@ -264,7 +273,19 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     const field =
       table?.fieldList?.find((item) => item.dbFieldName === columnName) ??
       table?.fields?.ordered?.find((item) => item.dbFieldName === columnName);
-    return field?.dbFieldType as DbFieldType | undefined;
+    if (field) {
+      return field.dbFieldType as DbFieldType | undefined;
+    }
+
+    // Handle CTE-projected lookup/rollup aliases like "lookup_<fieldId>" that aren't part of the
+    // base table's dbFieldName list but still correspond to concrete field metadata.
+    const lookupMatch = columnName.match(/^(lookup|rollup)_(fld[A-Za-z0-9]+)$/);
+    if (lookupMatch && typeof table?.getField === 'function') {
+      const byId = table.getField(lookupMatch[2]);
+      return byId?.dbFieldType as DbFieldType | undefined;
+    }
+
+    return undefined;
   }
 
   private isHardTextExpression(value: string): boolean {
@@ -1241,6 +1262,18 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
       return `CASE WHEN COALESCE(${wrapped}, FALSE) THEN 1 ELSE 0 END`;
     }
 
+    if (
+      paramInfo?.isJsonField ||
+      paramInfo?.isMultiValueField ||
+      paramInfo?.fieldDbType === DbFieldType.Json
+    ) {
+      return `CASE
+        WHEN ${wrapped} IS NULL THEN 0
+        WHEN (${wrapped})::text IN ('null', '[]', '{}', '') THEN 0
+        ELSE 1
+      END`;
+    }
+
     if (isTrustedNumeric(paramInfo)) {
       const numericExpr = this.toNumericSafe(normalizedValue, metadataIndex);
       return `CASE WHEN COALESCE(${numericExpr}, 0) <> 0 THEN 1 ELSE 0 END`;
@@ -1571,7 +1604,7 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
 
   // Unary Operations
   unaryMinus(value: string): string {
-    const numericValue = this.toNumericSafe(value);
+    const numericValue = this.toNumericSafe(value, 0);
     return `(-(${numericValue}))`;
   }
 
