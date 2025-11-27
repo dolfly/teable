@@ -319,4 +319,114 @@ describe('Generated column numeric coercion (e2e)', () => {
       expect(updatedRecord.fields[statusField.id]).toBe('ready');
     });
   });
+
+  describe('workday diff with numeric inputs', () => {
+    let table: ITableFullVo;
+    let monthField: IFieldVo;
+    let workdayDiffField: IFieldVo;
+
+    beforeEach(async () => {
+      table = await createTable(baseId, {
+        name: 'generated_workday_numeric',
+        fields: [
+          {
+            name: 'Month Number',
+            type: FieldType.Number,
+          },
+        ],
+        records: [
+          {
+            fields: {
+              'Month Number': 8,
+            },
+          },
+        ],
+      });
+
+      const fieldMap = new Map(table.fields.map((field) => [field.name, field]));
+      monthField = fieldMap.get('Month Number')!;
+
+      workdayDiffField = await createField(table.id, {
+        name: 'Workdays Delta',
+        type: FieldType.Formula,
+        options: {
+          expression: `WORKDAY_DIFF({${monthField.id}} + 1, {${monthField.id}})`,
+          timeZone: 'Etc/GMT-8',
+        },
+      });
+    });
+
+    afterEach(async () => {
+      if (table) {
+        await permanentDeleteTable(baseId, table.id);
+      }
+    });
+
+    it('returns null instead of raising a cast error', async () => {
+      const recordId = table.records[0].id;
+
+      const createdRecord = await getRecord(table.id, recordId);
+      expect(createdRecord.fields[workdayDiffField.id] ?? null).toBeNull();
+
+      await expect(updateRecordByApi(table.id, recordId, monthField.id, 12)).resolves.toBeDefined();
+
+      const updatedRecord = await getRecord(table.id, recordId);
+      expect(updatedRecord.fields[workdayDiffField.id] ?? null).toBeNull();
+    });
+  });
+
+  describe('workday diff referencing numeric formula (regression)', () => {
+    let table: ITableFullVo;
+    let monthFormulaField: IFieldVo;
+    let workdayDiffField: IFieldVo;
+
+    beforeEach(async () => {
+      table = await createTable(baseId, {
+        name: 'generated_workday_formula_ref',
+        fields: [
+          {
+            name: 'Dummy',
+            type: FieldType.Number,
+          },
+        ],
+        records: [
+          {
+            fields: {
+              Dummy: 1,
+            },
+          },
+        ],
+      });
+
+      monthFormulaField = await createField(table.id, {
+        name: 'Month Num',
+        type: FieldType.Formula,
+        options: {
+          expression: 'MONTH(TODAY())-1',
+          timeZone: 'Etc/GMT-8',
+        },
+      });
+
+      workdayDiffField = await createField(table.id, {
+        name: 'Month Workdays',
+        type: FieldType.Formula,
+        options: {
+          expression: `WORKDAY_DIFF({${monthFormulaField.id}} + 1, {${monthFormulaField.id}})`,
+          timeZone: 'Etc/GMT-8',
+        },
+      });
+    });
+
+    afterEach(async () => {
+      if (table) {
+        await permanentDeleteTable(baseId, table.id);
+      }
+    });
+
+    it('returns null when numeric formula is used as date input', async () => {
+      const recordId = table.records[0].id;
+      const createdRecord = await getRecord(table.id, recordId);
+      expect(createdRecord.fields[workdayDiffField.id] ?? null).toBeNull();
+    });
+  });
 });

@@ -635,9 +635,24 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     );
   }
 
+  private shouldTreatAsDatetime(expr: string, metadataIndex?: number): boolean {
+    const paramInfo = this.getParamInfo(metadataIndex);
+    if (paramInfo?.hasMetadata) {
+      const looksDatetime =
+        isDatetimeLikeParam(paramInfo) ||
+        paramInfo.fieldDbType === DbFieldType.DateTime ||
+        paramInfo.fieldCellValueType === 'datetime';
+      if (looksDatetime) {
+        return true;
+      }
+    }
+    return this.isTimestampish(expr);
+  }
+
   private tzWrap(date: string, metadataIndex?: number): string {
     const tz = this.context?.timeZone as string | undefined;
-    const trusted = this.isTrustedDatetime(date, metadataIndex);
+    const shouldTreat = this.shouldTreatAsDatetime(date, metadataIndex);
+    const trusted = shouldTreat && this.isTrustedDatetime(date, metadataIndex);
     const alreadyTimestamp = this.isTimestampish(date);
     const needsSanitize = !(trusted || alreadyTimestamp);
     const baseExpr = needsSanitize ? this.sanitizeTimestampInput(date) : `(${date})`;
@@ -1190,13 +1205,21 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
   }
 
   workday(startDate: string, days: string): string {
+    if (!this.isDateLikeOperand(0)) {
+      return 'NULL';
+    }
     // Simplified implementation in the target timezone
     return `(${this.tzWrap(startDate, 0)})::date + INTERVAL '${days} days'`;
   }
 
   workdayDiff(startDate: string, endDate: string): string {
-    // Simplified implementation
-    return `${endDate}::date - ${startDate}::date`;
+    if (!this.isDateLikeOperand(0) || !this.isDateLikeOperand(1)) {
+      return 'NULL';
+    }
+    // Simplified implementation with timezone-aware, sanitized inputs
+    const start = `(${this.tzWrap(startDate, 0)})`;
+    const end = `(${this.tzWrap(endDate, 1)})`;
+    return `${end}::date - ${start}::date`;
   }
 
   year(date: string): string {
