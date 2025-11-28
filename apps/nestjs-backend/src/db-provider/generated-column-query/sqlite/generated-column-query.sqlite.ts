@@ -343,6 +343,7 @@ export class GeneratedColumnQuerySqlite extends GeneratedColumnQueryAbstract {
         return { unit: 'seconds', factor: 0.001 };
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return { unit: 'seconds', factor: 1 };
@@ -386,6 +387,7 @@ export class GeneratedColumnQuerySqlite extends GeneratedColumnQueryAbstract {
         return 'millisecond';
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return 'second';
@@ -424,6 +426,7 @@ export class GeneratedColumnQuerySqlite extends GeneratedColumnQueryAbstract {
       case 'ms':
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return '%Y-%m-%d %H:%M:%S';

@@ -97,6 +97,7 @@ describe('OpenAPI formula (e2e)', () => {
     { literal: 'millisecond', expected: diffMilliseconds },
     { literal: 'milliseconds', expected: diffMilliseconds },
     { literal: 'ms', expected: diffMilliseconds },
+    { literal: 's', expected: diffSeconds },
     { literal: 'second', expected: diffSeconds },
     { literal: 'seconds', expected: diffSeconds },
     { literal: 'sec', expected: diffSeconds },
