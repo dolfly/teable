@@ -532,9 +532,13 @@ export type I18nTranslations = {
                 "linkRemove": string;
                 "desc_billable_one": string;
                 "desc_billable_other": string;
+                "spaceTitleWithCount": string;
                 "baseTitle": string;
                 "allCollaboratorsTitle": string;
                 "baseOnly": string;
+                "noInviteLinks": string;
+                "linkDescription": string;
+                "haveAccess": string;
                 "desc": string;
             };
             "base": {
@@ -543,10 +547,22 @@ export type I18nTranslations = {
                 "desc_other": string;
                 "baseTitle": string;
                 "collaboratorSearchPlaceholder": string;
+                "baseTitleWithCount": string;
             };
             "addOrgCollaborator": {
                 "title": string;
                 "placeholder": string;
+            };
+            "sendInvitationSuccess": string;
+            "table": {
+                "collaborator": string;
+                "accessPermission": string;
+                "joinAt": string;
+            };
+            "authority": {
+                "title": string;
+                "description": string;
+                "viewDetail": string;
             };
         };
         "help": {

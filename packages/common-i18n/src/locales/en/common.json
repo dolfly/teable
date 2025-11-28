@@ -329,12 +329,13 @@
       "desc_billable_one": "This space has <b>{{count}} collaborator</b> and <b>{{billableCount}} billable user</b>. Adding a space collaborator will give them access to all bases within this space.",
       "desc_billable_other": "This space has <b>{{count}} collaborators</b> and <b>{{billableCount}} billable users</b>. Adding a space collaborator will give them access to all bases within this space.",
       "tabEmail": "Invite by email",
-      "emailPlaceholder": "Invite more collaborators via email",
+      "emailPlaceholder": "Enter email addresses, separated by 'Enter' key",
       "tabLink": "Invite by link",
       "linkPlaceholder": "Create an invite link that grants <0/> access to anyone who opens it.",
       "emailSend": "Send invite",
       "linkSend": "Create link",
       "spaceTitle": "Space collaborators",
+      "spaceTitleWithCount": "Space collaborators ({{count}})",
       "baseTitle": "Base collaborators",
       "allCollaboratorsTitle": "All collaborators (Space & Base)",
       "baseOnly": "Base only",
@@ -344,18 +345,33 @@
       "linkTitle": "Invite links",
       "linkCreatedTime": "created {{createdTime}}",
       "linkCopySuccess": "Link copied",
-      "linkRemove": "Remove link"
+      "linkRemove": "Remove link",
+      "noInviteLinks": "No invite links",
+      "linkDescription": "Create an invitation link and assign permissions",
+      "haveAccess": "Have access"
     },
     "base": {
       "title": "Share {{baseName}}",
       "desc_one": "This base is shared with {{count}} collaborator.",
       "desc_other": "This base is shared with {{count}} collaborators.",
       "baseTitle": "Base collaborators",
-      "collaboratorSearchPlaceholder": "Find a base collaborator by name or email"
+      "collaboratorSearchPlaceholder": "Find a base collaborator by name or email",
+      "baseTitleWithCount": "Base collaborators ({{count}})"
     },
     "addOrgCollaborator": {
       "title": "Add organization collaborator",
       "placeholder": "Select organization member or department"
+    },
+    "sendInvitationSuccess": "Invitation has been sent",
+    "table": {
+      "collaborator": "Collaborator",
+      "accessPermission": "Access permission",
+      "joinAt": "Joined at"
+    },
+    "authority": {
+      "title": "Authority Matrix is enabled",
+      "description": "Collaborators’ s effective access permission is affected by the roles assigned to them, Unassigned user using the default role",
+      "viewDetail": "View detail"
     }
   },
   "help": {
