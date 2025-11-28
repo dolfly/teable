@@ -57,6 +57,10 @@ describe('SelectQuerySqlite unit-aware date helpers', () => {
       expected: '((JULIANDAY(date_start) - JULIANDAY(date_end))) * 24.0 * 60 * 60 * 1000',
     },
     {
+      literal: 's',
+      expected: '((JULIANDAY(date_start) - JULIANDAY(date_end))) * 24.0 * 60 * 60',
+    },
+    {
       literal: 'second',
       expected: '((JULIANDAY(date_start) - JULIANDAY(date_end))) * 24.0 * 60 * 60',
     },
@@ -125,6 +129,7 @@ describe('SelectQuerySqlite unit-aware date helpers', () => {
     { literal: 'millisecond', format: '%Y-%m-%d %H:%M:%S' },
     { literal: 'milliseconds', format: '%Y-%m-%d %H:%M:%S' },
     { literal: 'ms', format: '%Y-%m-%d %H:%M:%S' },
+    { literal: 's', format: '%Y-%m-%d %H:%M:%S' },
     { literal: 'second', format: '%Y-%m-%d %H:%M:%S' },
     { literal: 'seconds', format: '%Y-%m-%d %H:%M:%S' },
     { literal: 'sec', format: '%Y-%m-%d %H:%M:%S' },

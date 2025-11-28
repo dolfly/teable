@@ -299,6 +299,7 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
         return { unit: 'millisecond', factor: 1 };
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return { unit: 'second', factor: 1 };
@@ -345,6 +346,7 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
         return 'millisecond';
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return 'second';
@@ -386,6 +388,7 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
         return 'millisecond';
       case 'second':
       case 'seconds':
+      case 's':
       case 'sec':
       case 'secs':
         return 'second';
