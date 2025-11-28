@@ -103,6 +103,26 @@ describe('SelectQueryPostgres unit-aware date helpers', () => {
     query.setCallMetadata(undefined);
   });
 
+  it('casts nested text IF chains without ballooning JSON coercions', () => {
+    const nestedIf = (depth: number): string => {
+      query.setCallMetadata([
+        { type: 'boolean', isFieldReference: false } as unknown as IFormulaParamMetadata,
+        { type: 'string', isFieldReference: false } as unknown as IFormulaParamMetadata,
+        { type: 'string', isFieldReference: false } as unknown as IFormulaParamMetadata,
+      ]);
+      const result =
+        depth === 0 ? `'leaf'` : query.if('1', `'branch_${depth}'`, nestedIf(depth - 1));
+      query.setCallMetadata(undefined);
+      return result;
+    };
+
+    const sql = nestedIf(8);
+
+    expect(sql).not.toContain('jsonb_typeof');
+    expect(sql).not.toContain('to_jsonb');
+    expect(sql.length).toBeLessThan(5000);
+  });
+
   it('avoids regex coercion for unary minus numeric literals', () => {
     query.setCallMetadata(undefined);
     const sql = query.value(query.unaryMinus('7'));

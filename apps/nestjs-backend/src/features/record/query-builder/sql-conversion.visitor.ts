@@ -88,6 +88,7 @@ const STRING_FUNCTIONS = new Set<FunctionName>([
   FunctionName.Substitute,
   FunctionName.Replace,
   FunctionName.T,
+  FunctionName.Blank,
   FunctionName.Datestr,
   FunctionName.Timestr,
   FunctionName.ArrayJoin,

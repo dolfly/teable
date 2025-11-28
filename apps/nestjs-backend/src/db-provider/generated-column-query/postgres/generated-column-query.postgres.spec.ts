@@ -79,6 +79,26 @@ describe('GeneratedColumnQueryPostgres unit-aware helpers', () => {
     });
   });
 
+  it('casts nested text IF chains without recursive JSON coercion', () => {
+    const nestedIf = (depth: number): string => {
+      query.setCallMetadata([
+        { type: 'boolean', isFieldReference: false } as unknown as IFormulaParamMetadata,
+        { type: 'string', isFieldReference: false } as unknown as IFormulaParamMetadata,
+        { type: 'string', isFieldReference: false } as unknown as IFormulaParamMetadata,
+      ]);
+      const result =
+        depth === 0 ? `'leaf'` : query.if('1', `'branch_${depth}'`, nestedIf(depth - 1));
+      query.setCallMetadata(undefined);
+      return result;
+    };
+
+    const sql = nestedIf(8);
+
+    expect(sql).not.toContain('jsonb_typeof');
+    expect(sql).not.toContain('to_jsonb');
+    expect(sql.length).toBeLessThan(5000);
+  });
+
   const dateAddCases: Array<{ literal: string; unit: string; factor: number }> = [
     { literal: 'millisecond', unit: 'millisecond', factor: 1 },
     { literal: 'milliseconds', unit: 'millisecond', factor: 1 },
