@@ -4044,6 +4044,88 @@ describe('OpenAPI formula (e2e)', () => {
       expect(numericValue).toBe(-4);
     });
 
+    it('should treat null numeric operands as zero for comparison operators', async () => {
+      const leftNumber = await createField(table1Id, {
+        name: 'left-nullable-number',
+        type: FieldType.Number,
+        options: {
+          formatting: { type: NumberFormattingType.Decimal, precision: 0 },
+        },
+      });
+
+      const rightNumber = await createField(table1Id, {
+        name: 'right-nullable-number',
+        type: FieldType.Number,
+        options: {
+          formatting: { type: NumberFormattingType.Decimal, precision: 0 },
+        },
+      });
+
+      const gtFormula = await createField(table1Id, {
+        name: 'null-gt-zero-aware',
+        type: FieldType.Formula,
+        options: {
+          expression: `IF({${leftNumber.id}} > {${rightNumber.id}}, 'left', 'right')`,
+        },
+      });
+
+      const ltFormula = await createField(table1Id, {
+        name: 'null-lt-zero-aware',
+        type: FieldType.Formula,
+        options: {
+          expression: `IF({${leftNumber.id}} < {${rightNumber.id}}, 'less', 'not-less')`,
+        },
+      });
+
+      const eqFormula = await createField(table1Id, {
+        name: 'null-eq-zero-aware',
+        type: FieldType.Formula,
+        options: {
+          expression: `IF({${leftNumber.id}} = {${rightNumber.id}}, 'equal', 'different')`,
+        },
+      });
+
+      const { records } = await createRecords(table1Id, {
+        fieldKeyType: FieldKeyType.Name,
+        records: [
+          {
+            fields: {
+              [rightNumber.name]: -1,
+            },
+          },
+          {
+            fields: {
+              [rightNumber.name]: 3,
+            },
+          },
+          {
+            fields: {
+              [rightNumber.name]: 0,
+            },
+          },
+          {
+            fields: {
+              [leftNumber.name]: 2,
+            },
+          },
+        ],
+      });
+
+      const expectations = [
+        { gt: 'left', lt: 'not-less', eq: 'different' }, // null > -1 should behave like 0 > -1
+        { gt: 'right', lt: 'less', eq: 'different' }, // null < 3 should behave like 0 < 3
+        { gt: 'right', lt: 'not-less', eq: 'equal' }, // null = 0 should behave like 0 = 0
+        { gt: 'left', lt: 'not-less', eq: 'different' }, // 2 > null should behave like 2 > 0
+      ];
+
+      records.forEach((record, index) => {
+        const expected = expectations[index];
+        expect(record.fields[gtFormula.name]).toBe(expected.gt);
+        expect(record.fields[ltFormula.name]).toBe(expected.lt);
+        expect(record.fields[eqFormula.name]).toBe(expected.eq);
+      });
+    });
+
     it('should evaluate nested logical formulas with mixed field types', async () => {
       const selectField = await createField(table1Id, {
         name: 'logical-select',

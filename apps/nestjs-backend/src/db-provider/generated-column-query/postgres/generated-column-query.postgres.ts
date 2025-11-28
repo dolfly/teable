@@ -28,6 +28,21 @@ export class GeneratedColumnQueryPostgres extends GeneratedColumnQueryAbstract {
     return this.stripOuterParentheses(value).toUpperCase() === 'NULL';
   }
 
+  private shouldCoalesceNumericComparison(value: string, metadataIndex?: number): boolean {
+    if (this.isNumericLiteral(value)) {
+      return true;
+    }
+    const paramInfo = metadataIndex != null ? this.getParamInfo(metadataIndex) : undefined;
+    return paramInfo ? isTrustedNumeric(paramInfo) || paramInfo.type === 'number' : false;
+  }
+
+  private normalizeNumericComparisonOperand(value: string, metadataIndex?: number): string {
+    if (!this.shouldCoalesceNumericComparison(value, metadataIndex)) {
+      return value;
+    }
+    return this.collapseNumeric(value, metadataIndex);
+  }
+
   private hasWrappingParentheses(expr: string): boolean {
     if (!expr.startsWith('(') || !expr.endsWith(')')) {
       return false;
@@ -203,6 +218,19 @@ export class GeneratedColumnQueryPostgres extends GeneratedColumnQueryAbstract {
     const leftIsText = this.isTextLikeExpression(left, leftIndex);
     const rightIsText = this.isTextLikeExpression(right, rightIndex);
     const normalizeText = leftIsEmptyLiteral || rightIsEmptyLiteral || leftIsText || rightIsText;
+
+    const leftIsNumericComparable = this.shouldCoalesceNumericComparison(left, leftIndex);
+    const rightIsNumericComparable = this.shouldCoalesceNumericComparison(right, rightIndex);
+
+    if (!normalizeText && (leftIsNumericComparable || rightIsNumericComparable)) {
+      const normalizedLeft = leftIsNumericComparable
+        ? this.normalizeNumericComparisonOperand(left, leftIndex)
+        : left;
+      const normalizedRight = rightIsNumericComparable
+        ? this.normalizeNumericComparisonOperand(right, rightIndex)
+        : right;
+      return `(${normalizedLeft} ${operator} ${normalizedRight})`;
+    }
 
     if (!normalizeText) {
       return `(${left} ${operator} ${right})`;
@@ -651,6 +679,30 @@ export class GeneratedColumnQueryPostgres extends GeneratedColumnQueryAbstract {
 
   notEqual(left: string, right: string): string {
     return this.buildBlankAwareComparison('<>', left, right, { left: 0, right: 1 });
+  }
+
+  greaterThan(left: string, right: string): string {
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} > ${normalizedRight})`;
+  }
+
+  lessThan(left: string, right: string): string {
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} < ${normalizedRight})`;
+  }
+
+  greaterThanOrEqual(left: string, right: string): string {
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} >= ${normalizedRight})`;
+  }
+
+  lessThanOrEqual(left: string, right: string): string {
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} <= ${normalizedRight})`;
   }
 
   // Override bitwiseAnd to handle PostgreSQL-specific type conversion

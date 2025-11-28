@@ -239,6 +239,22 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     return this.stripOuterParentheses(value).toUpperCase() === 'NULL';
   }
 
+  private shouldCoalesceNumericComparison(value: string, metadataIndex?: number): boolean {
+    if (this.isNumericLiteral(value)) {
+      return true;
+    }
+    const paramInfo = metadataIndex != null ? this.getParamInfo(metadataIndex) : undefined;
+    return paramInfo ? isTrustedNumeric(paramInfo) || paramInfo.type === 'number' : false;
+  }
+
+  private normalizeNumericComparisonOperand(value: string, metadataIndex?: number): string {
+    if (!this.shouldCoalesceNumericComparison(value, metadataIndex)) {
+      return value;
+    }
+    const numericValue = this.toNumericSafe(value, metadataIndex);
+    return `COALESCE(${numericValue}, 0)`;
+  }
+
   private normalizeBlankComparable(value: string, metadataIndex?: number): string {
     const comparable = this.coerceToTextComparable(value, metadataIndex);
     // Force text comparison so numeric fields compared against '' won't cast '' to double precision
@@ -624,6 +640,19 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
       rightIsNullLiteral ||
       leftIsText ||
       rightIsText;
+
+    const leftIsNumericComparable = this.shouldCoalesceNumericComparison(left, leftIndex);
+    const rightIsNumericComparable = this.shouldCoalesceNumericComparison(right, rightIndex);
+
+    if (!normalizeText && (leftIsNumericComparable || rightIsNumericComparable)) {
+      const normalizedLeft = leftIsNumericComparable
+        ? this.normalizeNumericComparisonOperand(left, leftIndex)
+        : left;
+      const normalizedRight = rightIsNumericComparable
+        ? this.normalizeNumericComparisonOperand(right, rightIndex)
+        : right;
+      return `(${normalizedLeft} ${operator} ${normalizedRight})`;
+    }
 
     if (!normalizeText) {
       return `(${left} ${operator} ${right})`;
@@ -1631,19 +1660,27 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
   }
 
   greaterThan(left: string, right: string): string {
-    return `(${left} > ${right})`;
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} > ${normalizedRight})`;
   }
 
   lessThan(left: string, right: string): string {
-    return `(${left} < ${right})`;
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} < ${normalizedRight})`;
   }
 
   greaterThanOrEqual(left: string, right: string): string {
-    return `(${left} >= ${right})`;
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} >= ${normalizedRight})`;
   }
 
   lessThanOrEqual(left: string, right: string): string {
-    return `(${left} <= ${right})`;
+    const normalizedLeft = this.normalizeNumericComparisonOperand(left, 0);
+    const normalizedRight = this.normalizeNumericComparisonOperand(right, 1);
+    return `(${normalizedLeft} <= ${normalizedRight})`;
   }
 
   // Logical Operations

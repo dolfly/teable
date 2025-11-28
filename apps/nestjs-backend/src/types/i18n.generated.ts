@@ -2554,6 +2554,7 @@ export type I18nTranslations = {
             "invite": string;
         };
         "allSpaces": string;
+        "emptySpaceTitle": string;
         "spaceIsEmpty": string;
         "baseModal": {
             "copy": string;
@@ -2718,6 +2719,7 @@ export type I18nTranslations = {
         };
         "welcome": {
             "title": string;
+            "emptyTitle": string;
             "description": string;
             "help": string;
             "helpCenter": string;
