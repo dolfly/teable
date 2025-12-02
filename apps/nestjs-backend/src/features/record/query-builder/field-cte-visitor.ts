@@ -196,6 +196,12 @@ class FieldCteSelectionVisitor implements IFieldVisitor<IFieldSelectName> {
     preferRawFieldReferences = true,
     extraBlockedLinkIds?: Iterable<string | undefined>
   ): FieldSelectVisitor {
+    // Only allow link CTE references that are actually joined in this scope; otherwise
+    // the selector may emit a CTE reference that isn't present in FROM/JOIN, leading
+    // to "missing FROM-clause" errors in nested rollup/lookups during computed updates.
+    const scopedReadyLinkFieldIds = this.joinedCtes
+      ? new Set(this.joinedCtes)
+      : this.readyLinkFieldIds;
     return new FieldSelectVisitor(
       this.qb.client.queryBuilder(),
       this.dbProvider,
@@ -206,7 +212,7 @@ class FieldCteSelectionVisitor implements IFieldVisitor<IFieldSelectName> {
       rawProjection,
       preferRawFieldReferences,
       this.mergeBlockedLinkIds(extraBlockedLinkIds),
-      this.readyLinkFieldIds,
+      scopedReadyLinkFieldIds,
       this.currentLinkFieldId
     );
   }
@@ -808,19 +814,11 @@ class FieldCteSelectionVisitor implements IFieldVisitor<IFieldSelectName> {
     // Use table alias for cleaner SQL
     const recordIdRef = `"${foreignTableAlias}"."${ID_FIELD_NAME}"`;
 
-    const qb = this.qb.client.queryBuilder();
-    const selectVisitor = new FieldSelectVisitor(
-      qb,
-      this.dbProvider,
+    const selectVisitor = this.createFieldSelectVisitor(
       foreignTable,
-      new ScopedSelectionState(this.state),
-      this.dialect,
       foreignTableAlias,
       true,
-      false,
-      this.blockedLinkFieldIds,
-      undefined,
-      this.currentLinkFieldId
+      false
     );
     const targetFieldResult = targetLookupField.accept(selectVisitor);
     let rawSelectionExpression =
