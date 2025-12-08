@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Injectable } from '@nestjs/common';
 import type { LastModifiedByFieldCore, LastModifiedTimeFieldCore } from '@teable/core';
@@ -98,8 +99,10 @@ export class SystemFieldService {
           const type = field.type;
           if (type === FieldType.LastModifiedTime) {
             const lmtField = field as LastModifiedTimeFieldCore;
-            const trackAll = lmtField.isTrackAll();
-            const shouldUpdate = lmtField.shouldUpdate(changedFieldIds);
+            const trackedIds = lmtField.getTrackedFieldIds();
+            const validTrackedIds = trackedIds.filter((id) => table.hasField(id));
+            const trackAll = lmtField.isTrackAll() || validTrackedIds.length === 0;
+            const shouldUpdate = trackAll || validTrackedIds.some((id) => changedFieldIds.has(id));
             if (shouldUpdate) {
               pre[field[fieldKeyType]] = timeStr;
               if (!trackAll) {
@@ -112,8 +115,10 @@ export class SystemFieldService {
 
           if (type === FieldType.LastModifiedBy) {
             const lmbField = field as LastModifiedByFieldCore;
-            const trackAll = lmbField.isTrackAll();
-            const shouldUpdate = lmbField.shouldUpdate(changedFieldIds);
+            const trackedIds = lmbField.getTrackedFieldIds();
+            const validTrackedIds = trackedIds.filter((id) => table.hasField(id));
+            const trackAll = lmbField.isTrackAll() || validTrackedIds.length === 0;
+            const shouldUpdate = trackAll || validTrackedIds.some((id) => changedFieldIds.has(id));
             if (shouldUpdate) {
               const value = sanitizeAuditUserValue();
               pre[field[fieldKeyType]] = value;
