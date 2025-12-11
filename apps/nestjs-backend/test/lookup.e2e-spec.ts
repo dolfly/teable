@@ -287,6 +287,26 @@ describe('OpenAPI Lookup field (e2e)', () => {
       return expect(record.fields[lookupFieldVo.id]);
     }
 
+    async function expectLinkText(
+      table: ITableFullVo,
+      recordId: string,
+      linkFieldId: string,
+      expectedText: string
+    ) {
+      const deadline = Date.now() + 15000;
+      let lastValue: unknown;
+      do {
+        const record = await getRecord(table.id, recordId, CellFormat.Text);
+        lastValue = record.fields[linkFieldId];
+        if (lastValue === expectedText) {
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } while (Date.now() < deadline);
+
+      expect(lastValue).toEqual(expectedText);
+    }
+
     it('should update lookupField by remove a linkRecord from cell', async () => {
       const lookedUpToField = getFieldByType(table2.fields, FieldType.Number);
       const lookupFieldVo = await lookupFrom(table1, lookedUpToField.id);
@@ -599,31 +619,20 @@ describe('OpenAPI Lookup field (e2e)', () => {
     //   (await expectLookup(table1, FieldType.Number, 123)).toEqual([123]);
     // });
 
-    it('should update link field lookup value', async () => {
-      // add a link record after
-      await updateRecordByApi(
-        table1.id,
-        table1.records[1].id,
-        getFieldByType(table1.fields, FieldType.Link).id,
-        [{ id: table2.records[1].id }]
-      );
+    it('should expose link display text when requesting text cell format', async () => {
+      const linkField = getFieldByType(table1.fields, FieldType.Link);
+      const primaryField = getFieldByType(table2.fields, FieldType.SingleLineText);
 
-      await updateRecordByApi(
-        table2.id,
-        table2.records[1].id,
-        getFieldByType(table2.fields, FieldType.SingleLineText).id,
-        'text'
-      );
+      await updateRecordByApi(table2.id, table2.records[1].id, primaryField.id, 'text');
 
-      const record = await waitForLinkWithTitle(
-        table1.id,
-        table1.records[1].id,
-        getFieldByType(table1.fields, FieldType.Link).id,
-        table2.records[1].id,
-        'text'
-      );
+      await updateRecordByApi(table1.id, table1.records[1].id, linkField.id, [
+        { id: table2.records[1].id, title: 'text' },
+      ]);
 
-      expect(record.fields[getFieldByType(table1.fields, FieldType.Link).id]).toEqual([
+      await expectLinkText(table1, table1.records[1].id, linkField.id, 'text');
+
+      const recordJson = await getRecord(table1.id, table1.records[1].id, CellFormat.Json);
+      expect(recordJson.fields[linkField.id]).toEqual([
         { id: table2.records[1].id, title: 'text' },
       ]);
     });
