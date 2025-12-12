@@ -151,6 +151,50 @@ describe('Formula DATETIME_FORMAT token semantics (e2e)', () => {
     }
   });
 
+  it('supports Postgres month/day name specifiers without corrupting them', async () => {
+    let tableId: string | undefined;
+    const dateFieldId = generateFieldId();
+
+    try {
+      const table = await createTable(baseId, {
+        name: 'formula-datetime-format-postgres-names',
+        fields: [
+          { id: dateFieldId, name: 'event_date', type: FieldType.Date },
+          {
+            name: 'formatted_names',
+            type: FieldType.Formula,
+            options: {
+              expression: `DATETIME_FORMAT({${dateFieldId}}, 'YY-Month-Day')`,
+              timeZone: 'UTC',
+            },
+          },
+        ],
+      });
+      tableId = table.id;
+
+      const formattedFieldId =
+        table.fields.find((f) => f.name === 'formatted_names')?.id ??
+        (() => {
+          throw new Error('formatted_names field not found');
+        })();
+
+      const input = '2025-11-27T00:00:00.000Z';
+      const { records } = await createRecords(tableId, {
+        fieldKeyType: FieldKeyType.Name,
+        typecast: true,
+        records: [{ fields: { event_date: input } }],
+      });
+
+      const record = await getRecord(tableId, records[0].id);
+      const value = record.fields?.[formattedFieldId as string];
+      expect(value).toBe('25-November-Thursday');
+    } finally {
+      if (tableId) {
+        await permanentDeleteTable(baseId, tableId);
+      }
+    }
+  });
+
   it('returns null instead of throwing when formatting non-datetime text', async () => {
     let tableId: string | undefined;
     const textFieldId = generateFieldId();

@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/cognitive-complexity */
 /**
  * Normalize Airtable/Moment-style datetime format strings to PostgreSQL TO_CHAR/TO_TIMESTAMP patterns.
  * - HH / H are treated as 24-hour tokens (HH24 / FMHH24)
@@ -37,6 +38,13 @@ const normalizeAirtableDatetimeFormatLiteral = (literal: string): string => {
     { token: 'MI', replacement: 'MI' },
     { token: 'MS', replacement: 'MS' },
     { token: 'SS', replacement: 'SS' },
+    // Common Postgres textual tokens (add FM to avoid padding)
+    { token: 'Month', replacement: 'FMMonth' },
+    { token: 'MONTH', replacement: 'FMMONTH' },
+    { token: 'month', replacement: 'FMmonth' },
+    { token: 'Day', replacement: 'FMDay' },
+    { token: 'DAY', replacement: 'FMDAY' },
+    { token: 'day', replacement: 'FMday' },
     // Airtable/Moment style tokens
     { token: 'YYYY', replacement: 'YYYY' },
     { token: 'YY', replacement: 'YY' },
@@ -63,9 +71,21 @@ const normalizeAirtableDatetimeFormatLiteral = (literal: string): string => {
     const slice = literal.slice(i);
     const match = tokens.find(({ token }) => slice.startsWith(token));
     if (match) {
-      result += match.replacement;
-      i += match.token.length;
-      continue;
+      if (match.token.length === 1) {
+        const prevChar = i > 0 ? literal[i - 1] : '';
+        const nextChar = i + 1 < literal.length ? literal[i + 1] : '';
+        const prevIsAlpha = /[A-Z]/i.test(prevChar);
+        const nextIsAlpha = /[A-Z]/i.test(nextChar);
+        if (!prevIsAlpha && !nextIsAlpha) {
+          result += match.replacement;
+          i += 1;
+          continue;
+        }
+      } else {
+        result += match.replacement;
+        i += match.token.length;
+        continue;
+      }
     }
 
     result += literal[i];
