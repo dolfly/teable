@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 import { describe, expect, it } from 'vitest';
 
 import { getDefaultDatetimeParsePattern } from '../../utils/default-datetime-parse-pattern';
@@ -25,5 +26,16 @@ describe('SelectQueryPostgres tzWrap', () => {
 
     const sql = query.datetimeFormat('col', "'HH:mm:ss'");
     expect(sql).not.toContain('BTRIM');
+  });
+});
+
+describe('SelectQueryPostgres truthinessScore', () => {
+  it('casts boolean-like expressions before COALESCE to avoid text/boolean type errors', () => {
+    const query = new SelectQueryPostgres();
+    query.setContext({ timeZone: 'Asia/Shanghai' } as unknown as never);
+    query.setCallMetadata([{ type: 'boolean', isFieldReference: false }] as unknown as never);
+
+    const sql = query.if("('true')::text", "'yes'", "'no'");
+    expect(sql).toContain("COALESCE((('true')::text)::boolean, FALSE)");
   });
 });

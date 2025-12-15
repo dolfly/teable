@@ -1663,11 +1663,25 @@ export class RecordService {
 
     this.logger.debug('getSnapshotBulkInner query %s', nativeQuery);
 
-    const result = await this.prismaService
-      .txClient()
-      .$queryRawUnsafe<
-        ({ [fieldName: string]: unknown } & IVisualTableDefaultField)[]
-      >(nativeQuery);
+    let result: ({ [fieldName: string]: unknown } & IVisualTableDefaultField)[];
+    try {
+      result = await this.prismaService
+        .txClient()
+        .$queryRawUnsafe<
+          ({ [fieldName: string]: unknown } & IVisualTableDefaultField)[]
+        >(nativeQuery);
+    } catch (error) {
+      this.handleRawQueryError(error, nativeQuery, {
+        tableId,
+        viewQueryDbTableName,
+        recordIdsCount: recordIds.length,
+        recordIds: recordIds.slice(0, 20),
+        projectionFieldIds: fieldIds,
+        fieldKeyType,
+        cellFormat,
+        useQueryModel: query.useQueryModel,
+      });
+    }
 
     const recordIdsMap = recordIds.reduce(
       (acc, recordId, currentIndex) => {

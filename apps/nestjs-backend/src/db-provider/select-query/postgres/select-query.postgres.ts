@@ -350,16 +350,8 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
       return this.ensureTextCollation(expr);
     }
 
-    // When metadata tells us the operand is a multi/json field, trust it and avoid runtime pg_typeof
-    const useTrustedJson = !!paramInfo?.hasMetadata;
     const textExpr = `((${expr})::text)`;
-    const trustedJsonExpr = `(CASE WHEN ${expr} IS NULL THEN NULL ELSE to_jsonb(${expr}) END)`;
-    const guardedJsonExpr = `(CASE
-      WHEN ${expr} IS NULL THEN NULL
-      WHEN pg_typeof(${expr})::text IN ('json', 'jsonb') THEN (${expr})::jsonb
-      ELSE NULL
-    END)`;
-    const safeJsonExpr = useTrustedJson ? trustedJsonExpr : guardedJsonExpr;
+    const safeJsonExpr = `(CASE WHEN ${expr} IS NULL THEN NULL ELSE to_jsonb(${expr}) END)`;
 
     const flattened = `(CASE
       WHEN ${expr} IS NULL THEN NULL
@@ -405,25 +397,11 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
   }
 
   private coerceJsonExpressionToText(wrapped: string, metadataIndex?: number): string {
-    const paramInfo = metadataIndex != null ? this.getParamInfo(metadataIndex) : undefined;
-    const doubleWrapped = `(${wrapped})`;
-    const directJsonExpr = `to_jsonb${wrapped}`;
-    const fallbackJsonExpr = `to_jsonb${wrapped}`;
-    const jsonTypeGuard = `pg_typeof(${wrapped}) = ANY('{json,jsonb}'::regtype[])`;
-    const hasTrustedJsonMetadata =
-      !!paramInfo?.hasMetadata && (paramInfo.isJsonField || paramInfo.isMultiValueField);
-
-    if (hasTrustedJsonMetadata) {
-      return `(CASE
-        WHEN ${wrapped} IS NULL THEN NULL
-        ELSE ${this.buildJsonScalarCoercion(directJsonExpr)}
-      END)`;
-    }
-
+    void metadataIndex;
+    const jsonExpr = `to_jsonb${wrapped}`;
     return `(CASE
       WHEN ${wrapped} IS NULL THEN NULL
-      WHEN ${jsonTypeGuard} THEN ${this.buildJsonScalarCoercion(directJsonExpr)}
-      ELSE ${this.buildJsonScalarCoercion(fallbackJsonExpr)}
+      ELSE ${this.buildJsonScalarCoercion(jsonExpr)}
     END)`;
   }
 
@@ -1419,7 +1397,14 @@ export class SelectQueryPostgres extends SelectQueryAbstract {
     const paramInfo = this.getParamInfo(metadataIndex);
 
     if (isBooleanLikeParam(paramInfo)) {
-      return `CASE WHEN COALESCE(${wrapped}, FALSE) THEN 1 ELSE 0 END`;
+      // Prefer the simplest form when the operand is a real boolean column to keep generated SQL
+      // readable and stable for tests; otherwise cast to boolean to avoid COALESCE type errors
+      // when the operand is boolean-ish text (e.g. 'true'/'false') in raw projection contexts.
+      const boolExpr =
+        paramInfo.isFieldReference && paramInfo.fieldDbType === DbFieldType.Boolean
+          ? wrapped
+          : `${wrapped}::boolean`;
+      return `CASE WHEN COALESCE(${boolExpr}, FALSE) THEN 1 ELSE 0 END`;
     }
 
     if (
