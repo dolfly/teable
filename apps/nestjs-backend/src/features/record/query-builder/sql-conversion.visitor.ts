@@ -1087,6 +1087,13 @@ abstract class BaseSqlConversionVisitor<
       return this.getFieldInfoFromExpr(exprCtx.expr());
     }
 
+    if (
+      exprCtx instanceof LeftWhitespaceOrCommentsContext ||
+      exprCtx instanceof RightWhitespaceOrCommentsContext
+    ) {
+      return this.getFieldInfoFromExpr(exprCtx.expr());
+    }
+
     if (exprCtx instanceof FieldReferenceCurlyContext) {
       const normalizedFieldId = extractFieldReferenceId(exprCtx);
       const rawToken = getFieldReferenceTokenText(exprCtx);
@@ -1167,6 +1174,17 @@ abstract class BaseSqlConversionVisitor<
   }
 
   private isMultiValueExpr(exprCtx: ExprContext, paramSql?: string): boolean {
+    if (exprCtx instanceof BracketsContext) {
+      return this.isMultiValueExpr(exprCtx.expr(), paramSql);
+    }
+
+    if (
+      exprCtx instanceof LeftWhitespaceOrCommentsContext ||
+      exprCtx instanceof RightWhitespaceOrCommentsContext
+    ) {
+      return this.isMultiValueExpr(exprCtx.expr(), paramSql);
+    }
+
     const fieldInfo = this.getFieldInfoFromExpr(exprCtx);
     if (fieldInfo) {
       // When we have metadata for the referenced field, trust it instead of falling back to
@@ -1175,18 +1193,28 @@ abstract class BaseSqlConversionVisitor<
       return this.isMultiValueField(fieldInfo);
     }
 
-    if (paramSql) {
+    if (exprCtx instanceof FunctionCallContext) {
+      const rawName = exprCtx.func_name().text.toUpperCase();
+      const fnName = normalizeFunctionNameAlias(rawName) as FunctionName;
+      if (
+        fnName === FunctionName.ArrayUnique ||
+        fnName === FunctionName.ArrayFlatten ||
+        fnName === FunctionName.ArrayCompact
+      ) {
+        return true;
+      }
+    }
+
+    // Only attempt SQL-based heuristics for unresolved direct field references.
+    // For composite expressions (binary ops, comparisons, nested functions), the presence of
+    // "link_value"/"lookup_" fragments does not imply the *result* is multi-value.
+    if (exprCtx instanceof FieldReferenceCurlyContext && paramSql) {
       const lookupMatch = paramSql.match(/lookup_(fld[A-Za-z0-9]+)/);
       if (lookupMatch && this.context?.table) {
         const referencedField = this.context.table.getField(lookupMatch[1]);
         if (referencedField) {
           return this.isMultiValueField(referencedField as FieldCore);
         }
-      }
-
-      const normalized = paramSql.toLowerCase();
-      if (normalized.includes('link_value')) {
-        return true;
       }
     }
 
@@ -1556,7 +1584,7 @@ abstract class BaseSqlConversionVisitor<
         if (driver === DriverClient.Sqlite) {
           return `(COALESCE((${valueSql}), 0) != 0)`;
         }
-        return `(COALESCE(${this.normalizeBooleanFieldReference(valueSql, exprCtx) ?? valueSql}, FALSE))`;
+        return `(COALESCE((${this.normalizeBooleanFieldReference(valueSql, exprCtx) ?? valueSql})::boolean, FALSE))`;
       case 'number': {
         if (driver === DriverClient.Sqlite) {
           const numericExpr = this.safeCastToNumeric(valueSql);
