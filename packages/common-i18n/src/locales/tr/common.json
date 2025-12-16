@@ -350,18 +350,18 @@
         "modelPreferences": "Model tercihleri",
         "modelPreferencesDescription": "Model sağlayıcının model tercihleri",
         "embeddingModel": "Gömme modeli",
-        "embeddingModelDescription": "İsteğe bağlı, genellikle model kimliği \"embedding\" içerir",
+        "embeddingModelDescription": "Optional. For Document Q&A. Usually, the model ID contains \"embedding\".",
         "translationModel": "Çeviri modeli",
         "translationModelDescription": "Kullanılacak çeviri modeli",
         "chatModel": "Sohbet modeli",
         "chatModelDescription": "Kullanılacak sohbet modeli, İpucu: orta kodlama modeli varsayılan olarak AI formül üretimi ve ilgili özellikler için kullanılır",
         "chatModels": {
           "sm": "Küçük sohbet modeli",
-          "smDescription": "Sahne önerisi ve basit hızlı işlemler gibi görevler için kullanılır",
+          "smDescription": "Sohbet başlıkları ve veritabanı adlarını otomatik oluşturmak için kullanılır",
           "md": "Orta sohbet modeli",
-          "mdDescription": "Hız ve kalite gerektiren senaryolar için, veritabanı oluşturma gibi, GPT-4o kullanılması önerilir",
+          "mdDescription": "AI formül üretimi için kullanılır. Yapılandırılmamışsa gelişmiş modele geri döner",
           "lg": "Gelişmiş sohbet modeli",
-          "lgDescription": "Planlama, kodlama ve diğer karmaşık görev senaryoları için claude-sonnet-4 kullanılması önerilir"
+          "lgDescription": "Planlama, kodlama ve diğer karmaşık görev senaryoları için claude-sonnet-4.5 kullanılması önerilir"
         },
         "chatModelTest": {
           "text": "Test modeli",

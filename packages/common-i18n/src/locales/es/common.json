@@ -338,18 +338,18 @@
         "modelPreferences": "Preferencias de modelo",
         "modelPreferencesDescription": "Las preferencias del modelo para el proveedor de LLM",
         "embeddingModel": "Modelo de incrustación",
-        "embeddingModelDescription": "Opcional, generalmente la ID del modelo contiene \"incrustación\"",
+        "embeddingModelDescription": "Optional. For Document Q&A. Usually, the model ID contains \"embedding\".",
         "translationModel": "Modelo de traducción",
         "translationModelDescription": "El modelo de traducción para usar",
         "chatModel": "Modelo de chat",
         "chatModelDescription": "El modelo de chat a usar, Consejo: el modelo de codificación mediano se usa por defecto para generación de fórmulas AI y funciones relacionadas",
         "chatModels": {
           "sm": "Modelo de chat pequeño",
-          "smDescription": "Usado para tareas como recomendaciones de escena y operaciones rápidas simples",
+          "smDescription": "Usado para generar automáticamente títulos de chat y nombres de bases de datos",
           "md": "Modelo de chat mediano",
-          "mdDescription": "Para escenarios que requieren velocidad y calidad, como crear base de datos, se recomienda usar GPT-4o",
+          "mdDescription": "Usado para generar fórmulas AI. Recurre al modelo avanzado si no está configurado",
           "lg": "Modelo de chat avanzado",
-          "lgDescription": "Para planificación, codificación y otros escenarios de tareas complejas, se recomienda usar claude-sonnet-4"
+          "lgDescription": "Para planificación, codificación y otros escenarios de tareas complejas, se recomienda usar claude-sonnet-4.5"
         },
         "chatModelTest": {
           "text": "Probar modelo",
