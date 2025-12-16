@@ -47,40 +47,37 @@ export class FieldDuplicateService {
   ) {}
 
   async createCommonFields(fields: IFieldWithTableIdJson[], fieldMap: Record<string, string>) {
+    const byTable = new Map<string, IFieldWithTableIdJson[]>();
     for (const field of fields) {
-      const {
-        name,
-        type,
-        options,
-        targetTableId,
-        isPrimary,
-        notNull,
-        dbFieldName,
-        description,
-        unique,
-      } = field;
-      const newFieldVo = await this.fieldOpenApiService.createField(targetTableId, {
-        name,
-        type,
-        options,
-        dbFieldName,
-        description,
-      });
-      await this.replenishmentConstraint(newFieldVo.id, targetTableId, field.order, {
-        notNull,
-        unique,
-        dbFieldName: newFieldVo.dbFieldName,
-        isPrimary,
-      });
-      fieldMap[field.id] = newFieldVo.id;
-      await this.prismaService.txClient().field.update({
-        where: {
-          id: newFieldVo.id,
-        },
-        data: {
-          order: field.order,
-        },
-      });
+      const list = byTable.get(field.targetTableId) ?? [];
+      list.push(field);
+      byTable.set(field.targetTableId, list);
+    }
+
+    for (const [targetTableId, tableFields] of byTable.entries()) {
+      const fieldRos: IFieldRo[] = tableFields.map(
+        ({ name, type, options, dbFieldName, description }) => ({
+          name,
+          type,
+          options,
+          dbFieldName,
+          description,
+        })
+      );
+
+      const newFieldVos = await this.fieldOpenApiService.createFieldsByRo(targetTableId, fieldRos);
+
+      for (let index = 0; index < tableFields.length; index++) {
+        const original = tableFields[index];
+        const newFieldVo = newFieldVos[index];
+        await this.replenishmentConstraint(newFieldVo.id, targetTableId, original.order, {
+          notNull: original.notNull,
+          unique: original.unique,
+          dbFieldName: newFieldVo.dbFieldName,
+          isPrimary: original.isPrimary,
+        });
+        fieldMap[original.id] = newFieldVo.id;
+      }
     }
   }
 
@@ -102,60 +99,63 @@ export class FieldDuplicateService {
     primaryFormulaFields: IFieldWithTableIdJson[],
     fieldMap: Record<string, string>
   ) {
+    const byTable = new Map<string, IFieldWithTableIdJson[]>();
     for (const field of primaryFormulaFields) {
-      const {
-        type,
-        dbFieldName,
-        name,
-        options,
-        id,
-        notNull,
-        unique,
-        description,
-        isPrimary,
-        targetTableId,
-        order,
-        hasError,
-      } = field;
-      const newField = await this.fieldOpenApiService.createField(targetTableId, {
-        type,
-        dbFieldName,
-        description,
-        options: {
-          // ...options,
-          expression: DEFAULT_EXPRESSION,
-          timeZone: (options as IFormulaFieldOptions).timeZone,
-        },
-        name,
-      });
-      // Ensure meta is present for Postgres generated columns
-      // In duplication flow, we use a safe default expression that is supported as generated column
-      // Explicitly persist meta to satisfy consumers expecting it on error formulas
-      if (newField.meta) {
-        await this.prismaService.txClient().field.update({
-          where: { id: newField.id },
-          data: { meta: JSON.stringify(newField.meta) },
-        });
-      }
-      await this.replenishmentConstraint(newField.id, targetTableId, order, {
-        notNull,
-        unique,
-        dbFieldName,
-        isPrimary,
-      });
-      fieldMap[id] = newField.id;
+      const list = byTable.get(field.targetTableId) ?? [];
+      list.push(field);
+      byTable.set(field.targetTableId, list);
+    }
 
-      if (hasError) {
-        await this.prismaService.txClient().field.update({
-          where: {
-            id: newField.id,
+    for (const [targetTableId, tableFields] of byTable.entries()) {
+      const fieldRos: IFieldRo[] = tableFields.map(
+        ({ type, dbFieldName, description, options, name }) => ({
+          type,
+          dbFieldName,
+          description,
+          options: {
+            expression: DEFAULT_EXPRESSION,
+            timeZone: (options as IFormulaFieldOptions).timeZone,
           },
-          data: {
-            hasError,
-            // error formulas should not be persisted as generated columns
-            meta: null,
-          },
+          name,
+        })
+      );
+
+      const newFields = await this.fieldOpenApiService.createFieldsByRo(targetTableId, fieldRos);
+
+      for (let index = 0; index < tableFields.length; index++) {
+        const original = tableFields[index];
+        const newField = newFields[index];
+
+        // Ensure meta is present for Postgres generated columns
+        // In duplication flow, we use a safe default expression that is supported as generated column
+        // Explicitly persist meta to satisfy consumers expecting it on error formulas
+        if (newField.meta) {
+          await this.prismaService.txClient().field.update({
+            where: { id: newField.id },
+            data: { meta: JSON.stringify(newField.meta) },
+          });
+        }
+
+        await this.replenishmentConstraint(newField.id, targetTableId, original.order, {
+          notNull: original.notNull,
+          unique: original.unique,
+          dbFieldName: original.dbFieldName,
+          isPrimary: original.isPrimary,
         });
+        fieldMap[original.id] = newField.id;
+
+        if (original.hasError) {
+          await this.prismaService.txClient().field.update({
+            where: {
+              id: newField.id,
+            },
+            data: {
+              hasError: original.hasError,
+              // error formulas should not be persisted as generated columns
+              meta: null,
+            },
+          });
+        }
       }
     }
   }

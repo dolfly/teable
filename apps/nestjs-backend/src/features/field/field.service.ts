@@ -799,69 +799,138 @@ export class FieldService implements IReadonlyAdapterService {
    */
   // eslint-disable-next-line sonarjs/cognitive-complexity
   async recreateDependentFormulaColumns(tableId: string, fieldIds: string[]) {
-    if (!fieldIds?.length) return;
+    const uniqueSourceIds = Array.from(new Set((fieldIds ?? []).filter(Boolean)));
+    if (!uniqueSourceIds.length) return;
 
+    const prisma = this.prismaService.txClient();
     const tableDomain = await this.tableDomainQueryService.getTableDomainById(tableId);
 
-    for (const sourceFieldId of fieldIds) {
+    let deps: { id: string; tableId: string; level: number }[] = [];
+    try {
+      deps = await this.formulaFieldService.getDependentFormulaFieldsInOrderMulti(uniqueSourceIds);
+    } catch (e) {
+      this.logger.warn(
+        `recreateDependentFormulaColumns: failed to resolve dependents for ${tableId}: ${String(e)}`
+      );
+
+      // Fallback: preserve existing behavior (per-source query) if multi-root CTE fails
+      const results = await Promise.all(
+        uniqueSourceIds.map((id) =>
+          this.formulaFieldService
+            .getDependentFormulaFieldsInOrder(id)
+            .catch(() => [] as { id: string; tableId: string; level: number }[])
+        )
+      );
+      const merged = new Map<string, { id: string; tableId: string; level: number }>();
+      for (const list of results) {
+        for (const item of list) {
+          const current = merged.get(item.id);
+          if (!current || item.level > current.level) {
+            merged.set(item.id, item);
+          }
+        }
+      }
+      deps = Array.from(merged.values()).sort(
+        (a, b) => b.level - a.level || a.id.localeCompare(b.id)
+      );
+    }
+
+    const formulaIdsInOrder = deps.filter((d) => d.tableId === tableId).map((d) => d.id);
+    if (!formulaIdsInOrder.length) return;
+
+    const formulaRaws = await prisma.field.findMany({
+      where: { id: { in: formulaIdsInOrder }, tableId, deletedTime: null },
+    });
+    if (!formulaRaws.length) return;
+
+    const rawById = new Map(formulaRaws.map((r) => [r.id, r] as const));
+    const referencedIdSet = new Set<string>();
+    const formulas = formulaIdsInOrder
+      .map((id) => {
+        const raw = rawById.get(id);
+        if (!raw) return null;
+        const instance = createFieldInstanceByRaw(raw);
+        if (instance.type !== FieldType.Formula) return null;
+        const core = instance as FormulaFieldDto;
+        const referencedIds = (core.getReferenceFieldIds() || []).filter(Boolean);
+        referencedIds.forEach((fid) => referencedIdSet.add(fid));
+        return { id, rawHasError: raw.hasError === true, core, referencedIds };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      rawHasError: boolean;
+      core: FormulaFieldDto;
+      referencedIds: string[];
+    }>;
+
+    if (!formulas.length) return;
+
+    const existingRefSet = new Set<string>();
+    if (referencedIdSet.size) {
+      const existing = await prisma.field.findMany({
+        where: { id: { in: Array.from(referencedIdSet) }, deletedTime: null },
+        select: { id: true },
+      });
+      existing.forEach((row) => existingRefSet.add(row.id));
+    }
+
+    const toMarkErrorTrue: string[] = [];
+    const toMarkErrorFalse: string[] = [];
+    const toRecreate: Array<{ id: string; core: FormulaFieldDto }> = [];
+
+    for (const f of formulas) {
+      const allPresent = f.referencedIds.every((id) => existingRefSet.has(id));
+      if (!allPresent) {
+        if (!f.rawHasError) {
+          toMarkErrorTrue.push(f.id);
+        }
+        continue;
+      }
+
+      if (f.rawHasError) {
+        toMarkErrorFalse.push(f.id);
+      }
+
+      if (f.core.getIsPersistedAsGeneratedColumn()) {
+        toRecreate.push({ id: f.id, core: f.core });
+      }
+    }
+
+    if (toMarkErrorTrue.length) {
+      await this.markError(tableId, toMarkErrorTrue, true);
+    }
+    if (toMarkErrorFalse.length) {
+      await this.markError(tableId, toMarkErrorFalse, false);
+    }
+
+    if (!toRecreate.length) return;
+
+    const tableMeta = await prisma.tableMeta.findUnique({
+      where: { id: tableId },
+      select: { dbTableName: true },
+    });
+    if (!tableMeta) return;
+
+    const fieldMap = tableDomain.fields.toFieldMap();
+    const fieldMapObj = Object.fromEntries(fieldMap);
+
+    for (const { id: formulaFieldId, core } of toRecreate) {
       try {
-        const deps = await this.formulaFieldService.getDependentFormulaFieldsInOrder(sourceFieldId);
-        if (!deps.length) continue;
-
-        for (const { id: formulaFieldId, tableId: formulaTableId } of deps) {
-          if (formulaTableId !== tableId) continue;
-
-          const formulaRaw = await this.prismaService.txClient().field.findUnique({
-            where: { id: formulaFieldId, tableId: formulaTableId, deletedTime: null },
-          });
-          if (!formulaRaw) continue;
-
-          const formulaField = createFieldInstanceByRaw(formulaRaw);
-          if (formulaField.type !== FieldType.Formula) continue;
-
-          const formulaCore = formulaField as FormulaFieldDto;
-          const referencedIds = formulaCore.getReferenceFieldIds();
-          if (referencedIds.length) {
-            const existing = await this.prismaService.txClient().field.findMany({
-              where: { id: { in: referencedIds }, deletedTime: null },
-              select: { id: true },
-            });
-            const allPresent = existing.length === referencedIds.length;
-            if (!allPresent) {
-              await this.markError(formulaTableId, [formulaFieldId], true);
-              continue;
-            }
-          }
-
-          // Dependencies satisfied: clear error
-          await this.markError(formulaTableId, [formulaFieldId], false);
-
-          // If not persisted as generated column, nothing to recreate at DB level
-          if (!formulaCore.getIsPersistedAsGeneratedColumn()) continue;
-
-          // Recalculate types and recreate generated column
-          const fieldMap = tableDomain.fields.toFieldMap();
-          formulaCore.recalculateFieldTypes(Object.fromEntries(fieldMap));
-
-          const tableMeta = await this.prismaService.txClient().tableMeta.findUnique({
-            where: { id: formulaTableId },
-            select: { dbTableName: true },
-          });
-          if (!tableMeta) continue;
-
-          const sqls = this.dbProvider.modifyColumnSchema(
-            tableMeta.dbTableName,
-            formulaCore,
-            formulaCore,
-            tableDomain
-          );
-          for (const sql of sqls) {
-            await this.prismaService.txClient().$executeRawUnsafe(sql);
-          }
+        core.recalculateFieldTypes(fieldMapObj);
+        const sqls = this.dbProvider.modifyColumnSchema(
+          tableMeta.dbTableName,
+          core,
+          core,
+          tableDomain
+        );
+        for (const sql of sqls) {
+          await prisma.$executeRawUnsafe(sql);
         }
       } catch (e) {
         this.logger.warn(
-          `Failed to recreate dependent formulas for ${sourceFieldId}: ${String(e)}`
+          `recreateDependentFormulaColumns: failed to recreate generated column for ${formulaFieldId} in ${tableId}: ${String(
+            e
+          )}`
         );
       }
     }
