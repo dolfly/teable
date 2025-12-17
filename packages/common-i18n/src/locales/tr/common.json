@@ -357,11 +357,11 @@
         "chatModelDescription": "Kullanılacak sohbet modeli, İpucu: orta kodlama modeli varsayılan olarak AI formül üretimi ve ilgili özellikler için kullanılır",
         "chatModels": {
           "sm": "Küçük sohbet modeli",
-          "smDescription": "Sohbet başlıkları ve veritabanı adlarını otomatik oluşturmak için kullanılır",
+          "smDescription": "Sohbet başlıkları ve base adlarının otomatik oluşturulması için kullanılır. Önerilen: claude-haiku-4.5",
           "md": "Orta sohbet modeli",
-          "mdDescription": "AI formül üretimi için kullanılır. Yapılandırılmamışsa gelişmiş modele geri döner",
+          "mdDescription": "AI formül oluşturma için kullanılır. Yapılandırılmamışsa lg kullanılır. Önerilen: claude-haiku-4.5",
           "lg": "Gelişmiş sohbet modeli",
-          "lgDescription": "Planlama, kodlama ve diğer karmaşık görev senaryoları için claude-sonnet-4.5 kullanılması önerilir"
+          "lgDescription": "Planlama, kodlama ve diğer karmaşık görev senaryoları için. Önerilen: claude-sonnet-4.5"
         },
         "chatModelTest": {
           "text": "Test modeli",

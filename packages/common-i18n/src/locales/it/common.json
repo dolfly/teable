@@ -359,11 +359,11 @@
         "chatModelDescription": "Il modello di chat da utilizzare, Suggerimento: il modello di codifica medio viene utilizzato per impostazione predefinita per la generazione di formule AI e funzioni correlate",
         "chatModels": {
           "sm": "Modello di chat piccolo",
-          "smDescription": "Usato per generare automaticamente titoli delle chat e nomi dei database",
+          "smDescription": "Utilizzato per la generazione automatica di titoli chat e nomi base. Consigliato: claude-haiku-4.5",
           "md": "Modello di chat medio",
-          "mdDescription": "Usato per la generazione di formule AI. Ricade sul modello avanzato se non configurato",
+          "mdDescription": "Utilizzato per la generazione di formule AI. Usa lg se non configurato. Consigliato: claude-haiku-4.5",
           "lg": "Modello di chat avanzato",
-          "lgDescription": "Per pianificazione, codifica e altri scenari di compiti complessi, si consiglia di utilizzare claude-sonnet-4.5"
+          "lgDescription": "Per pianificazione, programmazione e altri scenari di attività complesse. Consigliato: claude-sonnet-4.5"
         },
         "chatModelTest": {
           "text": "Testa modello",

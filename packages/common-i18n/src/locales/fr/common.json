@@ -346,11 +346,11 @@
         "chatModelDescription": "Le modèle de chat à utiliser, Astuce : le modèle de codage moyen est utilisé par défaut pour la génération de formules AI et les fonctionnalités associées",
         "chatModels": {
           "sm": "Petit modèle de chat",
-          "smDescription": "Utilisé pour générer automatiquement les titres de chat et les noms de bases de données",
+          "smDescription": "Utilisé pour générer automatiquement les titres de chat et les noms de base. Recommandé: claude-haiku-4.5",
           "md": "Modèle de chat moyen",
-          "mdDescription": "Utilisé pour la génération de formules AI. Se replie sur le modèle avancé s'il n'est pas configuré",
+          "mdDescription": "Utilisé pour la génération de formules IA. Utilise lg par défaut si non configuré. Recommandé: claude-haiku-4.5",
           "lg": "Modèle de chat avancé",
-          "lgDescription": "Pour la planification, le codage et autres scénarios de tâches complexes, il est recommandé d'utiliser claude-sonnet-4.5"
+          "lgDescription": "Pour la planification, le codage et d'autres scénarios de tâches complexes. Recommandé: claude-sonnet-4.5"
         },
         "chatModelTest": {
           "text": "Tester le modèle",

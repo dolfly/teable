@@ -352,11 +352,11 @@
         "chatModelDescription": "使用するチャットモデル、ヒント: 中型コーディングモデルはAI数式生成と関連機能にデフォルトで使用されます",
         "chatModels": {
           "sm": "小型チャットモデル",
-          "smDescription": "チャットタイトルとデータベース名の自動生成に使用",
+          "smDescription": "チャットタイトルとベース名の自動生成に使用。推奨: claude-haiku-4.5",
           "md": "中型チャットモデル",
-          "mdDescription": "AI数式生成に使用。未設定の場合は高度なモデルにフォールバック",
+          "mdDescription": "AI数式生成に使用。未設定の場合はlgにフォールバック。推奨: claude-haiku-4.5",
           "lg": "高度なチャットモデル",
-          "lgDescription": "計画、コーディング、その他の複雑なタスクシナリオには、claude-sonnet-4.5の使用をお勧めします"
+          "lgDescription": "計画、コーディング、その他の複雑なタスクシナリオに使用。推奨: claude-sonnet-4.5"
         },
         "chatModelTest": {
           "text": "モデルをテスト",

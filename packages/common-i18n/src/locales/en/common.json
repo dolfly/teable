@@ -472,11 +472,11 @@
         "chatModelDescription": "The chat model to use, Tips: md model default used for AI formula generation and related features",
         "chatModels": {
           "sm": "Small chat model",
-          "smDescription": "Used for auto-generating chat titles and base names",
+          "smDescription": "Used for auto-generating chat titles and base names. Recommended: claude-haiku-4.5",
           "md": "Medium chat model",
-          "mdDescription": "Used for AI formula generation. Falls back to lg if not configured",
+          "mdDescription": "Used for AI formula generation. Falls back to lg if not configured. Recommended: claude-haiku-4.5",
           "lg": "Advanced chat model",
-          "lgDescription": "For planning, coding, and other complex task scenarios, it is recommended to use claude-sonnet-4.5"
+          "lgDescription": "For planning, coding, and other complex task scenarios. Recommended: claude-sonnet-4.5"
         },
         "actions": {
           "aiBasicCapability": {
