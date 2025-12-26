@@ -28,6 +28,13 @@ import { DB_PROVIDER_SYMBOL } from '../src/db-provider/db.provider';
 import type { IDbProvider } from '../src/db-provider/db.provider.interface';
 import { EventEmitterService } from '../src/event-emitter/event-emitter.service';
 import { Events } from '../src/event-emitter/events';
+import { FieldSelectVisitor } from '../src/features/record/query-builder/field-select-visitor';
+import { RecordQueryBuilderManager } from '../src/features/record/query-builder/record-query-builder.manager';
+import {
+  type IRecordQueryDialectProvider,
+  RECORD_QUERY_DIALECT_SYMBOL,
+} from '../src/features/record/query-builder/record-query-dialect.interface';
+import { TableDomainQueryService } from '../src/features/table-domain/table-domain-query.service';
 import { createAwaitWithEventWithResultWithCount } from './utils/event-promise';
 import {
   deleteField,
@@ -52,6 +59,8 @@ describe('Computed Orchestrator (e2e)', () => {
   let prisma: PrismaService;
   let knex: Knex;
   let db: IDbProvider;
+  let tableDomainQueryService: TableDomainQueryService;
+  let recordDialect: IRecordQueryDialectProvider;
   const baseId = (globalThis as any).testConfig.baseId as string;
 
   beforeAll(async () => {
@@ -61,6 +70,8 @@ describe('Computed Orchestrator (e2e)', () => {
     prisma = app.get(PrismaService);
     knex = app.get('CUSTOM_KNEX' as any);
     db = app.get<IDbProvider>(DB_PROVIDER_SYMBOL as any);
+    tableDomainQueryService = app.get(TableDomainQueryService);
+    recordDialect = app.get<IRecordQueryDialectProvider>(RECORD_QUERY_DIALECT_SYMBOL as any);
   });
 
   afterAll(async () => {
@@ -227,6 +238,43 @@ describe('Computed Orchestrator (e2e)', () => {
       await updateRecordByApi(table.id, recordId, aField.id, null);
       const updatedRecord = await getRecord(table.id, recordId);
       expect(updatedRecord.fields[formulaField.id]).toBe(0);
+
+      await permanentDeleteTable(baseId, table.id);
+    });
+
+    it('recomputes layered formulas after a formula definition change', async () => {
+      const table = await createTable(baseId, {
+        name: 'Formula_Layer_Recompute',
+        fields: [{ name: 'Amount', type: FieldType.Number } as IFieldRo],
+        records: [{ fields: { Amount: 5 } }],
+      });
+      const amountId = table.fields.find((f) => f.name === 'Amount')!.id;
+
+      const plusOne = await createField(table.id, {
+        name: 'PlusOne',
+        type: FieldType.Formula,
+        options: { expression: `{${amountId}} + 1` },
+      } as IFieldRo);
+
+      const plusTwo = await createField(table.id, {
+        name: 'PlusTwo',
+        type: FieldType.Formula,
+        options: { expression: `{${plusOne.id}} + 1` },
+      } as IFieldRo);
+
+      const recordId = table.records[0].id;
+      const initial = await getRecord(table.id, recordId);
+      expect(initial.fields[plusOne.id]).toEqual(6);
+      expect(initial.fields[plusTwo.id]).toEqual(7);
+
+      await convertField(table.id, plusOne.id, {
+        type: FieldType.Formula,
+        options: { expression: `{${amountId}} + 2` },
+      });
+
+      const updated = await getRecord(table.id, recordId);
+      expect(updated.fields[plusOne.id]).toEqual(7);
+      expect(updated.fields[plusTwo.id]).toEqual(8);
 
       await permanentDeleteTable(baseId, table.id);
     });
@@ -721,6 +769,70 @@ IF(
       } finally {
         await permanentDeleteTable(baseId, table.id);
       }
+    });
+  });
+
+  describe('Query Builder Selection', () => {
+    it('falls back to raw column selection when conditional lookup CTE is not joined', async () => {
+      const foreign = await createTable(baseId, {
+        name: 'ConditionalLookup_Selection_Foreign',
+        fields: [{ name: 'Value', type: FieldType.Number } as IFieldRo],
+        records: [{ fields: { Value: 10 } }],
+      });
+      const foreignValueId = foreign.fields.find((f) => f.name === 'Value')!.id;
+
+      const host = await createTable(baseId, {
+        name: 'ConditionalLookup_Selection_Host',
+        fields: [{ name: 'Title', type: FieldType.SingleLineText } as IFieldRo],
+        records: [{ fields: { Title: 'Row' } }],
+      });
+
+      const conditionalLookup = await createField(host.id, {
+        name: 'Filtered Value',
+        type: FieldType.Number,
+        isLookup: true,
+        isConditionalLookup: true,
+        lookupOptions: {
+          foreignTableId: foreign.id,
+          lookupFieldId: foreignValueId,
+          filter: {
+            conjunction: 'and',
+            filterSet: [
+              {
+                fieldId: foreignValueId,
+                operator: 'isNotEmpty',
+                value: null,
+              },
+            ],
+          },
+        } as ILookupOptionsRo,
+      } as IFieldRo);
+
+      const hostDomain = await tableDomainQueryService.getTableDomainById(host.id);
+      const lookupField = hostDomain.getField(conditionalLookup.id);
+      expect(lookupField?.isConditionalLookup).toBe(true);
+
+      const state = new RecordQueryBuilderManager('table');
+      const cteName = `CTE_CONDITIONAL_LOOKUP_${conditionalLookup.id}`;
+      state.setFieldCte(conditionalLookup.id, cteName);
+
+      const visitor = new FieldSelectVisitor(
+        knex.queryBuilder(),
+        db,
+        hostDomain,
+        state,
+        recordDialect,
+        't',
+        true,
+        true
+      );
+
+      const selection = lookupField!.accept(visitor);
+      const selectionSql = typeof selection === 'string' ? selection : selection.toQuery();
+      expect(selectionSql).toBe(`"t"."${lookupField!.dbFieldName}"`);
+
+      await permanentDeleteTable(baseId, host.id);
+      await permanentDeleteTable(baseId, foreign.id);
     });
   });
 
